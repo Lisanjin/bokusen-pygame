@@ -101,23 +101,23 @@ def execut_commands(tag,param):
         sound_control.start()
 
     if tag=="image":
-        pass
-        # if param[16]!="1":
-        #     image_num = int(param[-3])
-        #     image_type = jsonfile['data']['code']['images'][image_num].replace("https://resource-asw.bokusen.net/resource/img/script/","").split("/")[0] 
-        #     image_order = param[-8]
+        
+        if param[16]!="1":
+            image_num = int(param[-3])
+            image_type = jsonfile['data']['code']['images'][image_num].replace("https://resource-asw.bokusen.net/resource/img/script/","").split("/")[0] 
+            image_order = param[-8]
 
-        #     cg = get_images(image_num)
+            cg = get_images(image_num)
 
-        #     if image_order == "fore":
-        #         cg_control.set_fore_img(cg)
-        #     if image_order == "back":
-        #         cg_control.set_back_img(cg)
-        #     if image_type == "ev":
-        #         cg_control.set_fore_img(cg)
-        #         cg_control.set_back_img(cg)
+            if image_order == "fore":
+                cg_control.set_fore_img(cg)
+            if image_order == "back":
+                cg_control.set_back_img(cg)
+            if image_type == "ev":
+                cg_control.set_fore_img(cg)
+                cg_control.set_back_img(cg)
 
-        #     cg_control.show_cg()
+            cg_control.show_cg()
         
     if tag=="trans":
         pass
