@@ -11,12 +11,20 @@ import subprocess
 from pydub import AudioSegment
 from pydub.playback import play
 import math
+import concurrent.futures
 
-
+#用户设置
+user_setting_file =  open("settings.json",'r',encoding='utf8') 
+user_setting = json.load(user_setting_file)
+user_name = user_setting['user']['name']
+下载线程数 = user_setting['下载线程数']
+print('----用户设置，请到setting.json中修改------')
+print(user_setting)
+print('----------------------------------------')
 
 #常量
-display_width = 960
-display_height = 800
+display_width = user_setting['窗口宽度']
+display_height = user_setting['窗口高度']
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)    
 GAME_SIZE = (display_width,display_height)
@@ -205,56 +213,65 @@ def get_articles(num):
     articles = bokujson['data']['code']['articles']
     return articles[int(num)]
 
+
+def download_file(url, filename):
+    print(f'Downloading {filename}...')
+    download_times = 5
+    while download_times > 0:
+        try:
+            urlretrieve(url, filename)
+        except:
+            print("error downloading : " + filename)
+            download_times = download_times - 1
+            continue
+        else:
+            break
+    if 'm4a' in filename:
+        wav_file = filename.replace("m4a","wav")
+        AudioSegment.from_file(filename).export(wav_file, format="wav")
+        os.remove(filename)
+
+    
+    print(f'{filename} downloaded.')
+
+
+
 #资源下载
 def get_resource(json_file_name):
     os.makedirs("./resource/"+json_file_name+"/sounds/", exist_ok=True)
     os.makedirs("./resource/"+json_file_name+"/images/", exist_ok=True)
 
     print("你先别急")
+    start_time = time.time()
     with open("./json/"+json_file_name+".json",'r') as load_f:     
         bokujson = json.load(load_f)
         images = bokujson['data']['code']['images']
         sounds = bokujson['data']['code']['sounds']
+        file_dict = {}
+
         count = 0
         while(count<len(sounds)):
             endname = '.'+sounds[count].split('.')[-1]
-            download_times = 5
-            while download_times > 0:
-                try:
-                    urlretrieve(sounds[count], "./resource/"+json_file_name+"/sounds/"+str(count)+endname)
-                    print(str(count)+endname)
-                except:
-                    print("error downloading : " +str(count)+endname)
-                    download_times = download_times - 1
-                    continue
-                else:
-                    break
-
-            m4a_file = "./resource/"+json_file_name+"/sounds/"+str(count)+endname
-            wav_file = m4a_file.replace("m4a","wav")
-        
-            AudioSegment.from_file(m4a_file).export(wav_file, format="wav")
-            os.remove(m4a_file)
-
+            file_name = "./resource/"+json_file_name+"/sounds/"+str(count)+endname
+            url = sounds[count]
+            file_dict[url] = file_name
             count=count+1
 
-        print("sounds end")
         count = 0
         while(count<len(images)):
             endname = '.'+images[count].split('.')[-1]
-            download_times = 5
-            while download_times > 0:
-                try:
-                    urlretrieve(images[count], "./resource/"+json_file_name+"/images/"+str(count)+endname)
-                    print(str(count)+endname)
-                except:
-                    print("error downloading : " +str(count)+endname)
-                    download_times = download_times - 1
-                    continue
-                else:
-                    break
+            file_name = "./resource/"+json_file_name+"/images/"+str(count)+endname
+            url = images[count]
+            file_dict[url] = file_name
             count=count+1
-        print("images end")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=下载线程数) as executor:
+            futures = [executor.submit(download_file, url, filename) for url, filename in file_dict.items()]
+            concurrent.futures.wait(futures)
+
+    end_time = time.time()
+    run_time = end_time - start_time
+    print(f"耗时：{run_time}秒")
     print("下好了，开冲！")
 
 class Button:
@@ -437,6 +454,8 @@ jsonfile = get_json(json_file_name)
 commands = get_commands(jsonfile)
 json_list = get_list()
 pages_size = math.ceil(len(json_list)/6)
+
+
 
 #控制器
 cg_control = Cg_Controller()
