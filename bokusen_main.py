@@ -7,11 +7,10 @@ from pygame.locals import*
 from sys import exit
 import time
 import threading
-import subprocess
 from pydub import AudioSegment
-from pydub.playback import play
 import math
 import concurrent.futures
+import multiprocessing
 
 #用户设置
 user_setting_file =  open("settings.json",'r',encoding='utf8') 
@@ -21,7 +20,6 @@ user_name = user_setting['user']['name']
 print('----用户设置，请到setting.json中修改------')
 print(user_setting)
 print('----------------------------------------')
-
 #常量
 display_width = user_setting['窗口宽度']
 display_height = user_setting['窗口高度']
@@ -29,6 +27,7 @@ WHITE = (255, 255, 255)
 RED = (255, 0, 0)    
 GAME_SIZE = (display_width,display_height)
 CG_SIZE = (960,540)
+
 
 
 #初始化
@@ -62,16 +61,12 @@ def read_commands(jsonfile,num):
         commands= get_commands(jsonfile)
 
         while(num<len(commands)):
-        
-            # print(commands[num])
-            
+                     
             tags = bokujson['data']['code']['tags']
             tag = tags[int(commands[num][0])]
 
             parameters = bokujson['data']['code']['parameters']
             param = parameters[int(commands[num][1])]
-
-
 
             result = execut_commands(tag,param)    
 
@@ -101,12 +96,14 @@ def execut_commands(tag,param):
     if tag=="bgmopt":
         pass
     if tag=="playbgm":
+        global bgm_count
+        bgm_count = bgm_count+1
+
         print("playbgm")
         sound_file = get_sounds(param[-1])
-        
-        sound_control.set_sound(sound_file)
+        globals()["th_"+str(bgm_count)] = pygame.mixer.Sound(sound_file)
+        globals()["th_"+str(bgm_count)].play()
 
-        sound_control.start()
 
     if tag=="image":
         
@@ -171,7 +168,9 @@ def execut_commands(tag,param):
     if tag=="wait":
         pass
     if tag=="fadeoutbgm":
-        sound_control.set_play_status(False)
+        globals()["th_"+str(bgm_count)].fadeout(3)
+
+    
     if tag=="wb":
         pass
     if tag=="fadebgm":
@@ -388,32 +387,6 @@ class Anime_Controller(threading.Thread):
                 if not self.loop:
                     break
 
-class Sound_Controller(threading.Thread):
-    sounds_resource = ""
-    is_play = True
-
-    def __init__(self):
-        threading.Thread.__init__(self)
-
-    def set_sound(self,s):
-        self.sounds_resource= s
-
-    def set_play_status(self,status):
-        self.is_play = status
-
-    def run(self):
-        while self.is_play:
-
-            print("play:"+self.sounds_resource)
-            sound = AudioSegment.from_file(self.sounds_resource)
-            
-            play(sound, loop=True)
-
-            if not self.is_play:
-
-                break
-
-        
 #hs列表
 #获取列表
 def get_list():
@@ -448,10 +421,11 @@ def load_list(json_list):
     return button_list
 
 
+
 #数据
-json_file_name = "demo"
-jsonfile = get_json(json_file_name)
-commands = get_commands(jsonfile)
+json_file_name = ""
+jsonfile ={} #get_json(json_file_name)
+commands = []#get_commands(jsonfile)
 json_list = get_list()
 pages_size = math.ceil(len(json_list)/6)
 
@@ -461,12 +435,14 @@ pages_size = math.ceil(len(json_list)/6)
 cg_control = Cg_Controller()
 txt_control = Text_Controller()
 anime_control = Anime_Controller()
-sound_control = Sound_Controller()
+
 commands_count = 0
 is_play = False
 is_main = True
 json_list_page = 0
 json_selected = False
+bgm_count = 0
+settings ={'bgm_count',0}
 
 pages_up_rect = (600,550,150,50)
 page_down_rect = (150,550,150,50)
@@ -479,90 +455,78 @@ pages_down_button = Button(page_down_rect,"上一页")
 load_button = Button(load_rect,"load")
 play_button = Button(play_rect,"play")
 
+multiprocessing.freeze_support()
+multiprocessing.set_start_method('spawn')
 
-while True:
- 
-    for event in pygame.event.get():
-        if is_play:
+if __name__ == '__main__':
+    while True:
+    
+        for event in pygame.event.get():
+            if is_play:
 
-            if event.type == MOUSEBUTTONDOWN:
-                pygame.draw.rect(screen, (0, 0, 0), all_text_rect)
-            
-                read_commands(jsonfile,commands_count)
-
-        if json_selected:
-            load_button.show_button()
-            play_button.show_button()
-
-            if event.type == MOUSEBUTTONDOWN:
-                x = event.pos[0]
-                y = event.pos[1]
-
-                if load_button.in_rect(x,y):
-                    get_resource(json_file_name)
-                if play_button.in_rect(x,y):
-                    is_play = True
-                    json_selected = False
-                    is_main = False
-                    screen.fill((0,0,0))
-                    
-
-        if is_main:
-            new_list =  page_list(json_list_page,json_list)
-            json_button_list = load_list(new_list)
-
-            pages_up_button.show_button()
-            pages_down_button.show_button()
-
-            if event.type == MOUSEBUTTONDOWN:
-                x = event.pos[0]
-                y = event.pos[1]
-                print(json_list_page)
-
+                if event.type == MOUSEBUTTONDOWN:
+                    pygame.draw.rect(screen, (0, 0, 0), all_text_rect)
                 
+                    read_commands(jsonfile,commands_count)
 
-                for bt in json_button_list:
-                    if bt.in_rect(x,y):
-                        json_file_name= bt.text
-                        jsonfile = get_json(json_file_name)
-                        commands = get_commands(jsonfile)
+            if json_selected:
+                load_button.show_button()
+                play_button.show_button()
 
+                if event.type == MOUSEBUTTONDOWN:
+                    x = event.pos[0]
+                    y = event.pos[1]
+
+                    if load_button.in_rect(x,y):
+                        get_resource(json_file_name)
+                    if play_button.in_rect(x,y):
+                        is_play = True
+                        json_selected = False
+                        is_main = False
+                        screen.fill((0,0,0))
                         
 
-                        json_selected = True
+            if is_main:
+                new_list =  page_list(json_list_page,json_list)
+                json_button_list = load_list(new_list)
 
-                        print(bt.text)
+                pages_up_button.show_button()
+                pages_down_button.show_button()
 
-                if pages_up_button.in_rect(x,y):
-                    json_list_page = json_list_page + 1
-                    if json_list_page+1 > pages_size:
-                        json_list_page = 0
-                    new_list =  page_list(json_list_page,json_list)
-                    json_button_list = load_list(new_list)
+                if event.type == MOUSEBUTTONDOWN:
+                    x = event.pos[0]
+                    y = event.pos[1]
+                    print(json_list_page)
 
-                if pages_down_button.in_rect(x,y):
-                    json_list_page = json_list_page - 1
-                    if json_list_page < 0 :
-                        json_list_page = pages_size-1
-                    new_list =  page_list(json_list_page,json_list)
-                    json_button_list = load_list(new_list)
+                    
+                    for bt in json_button_list:
+                        if bt.in_rect(x,y):
+                            json_file_name= bt.text
+                            jsonfile = get_json(json_file_name)
+                            commands = get_commands(jsonfile)
 
+                            json_selected = True
 
-        
-        if event.type == QUIT:
-            exit()
-        if event.type == MOUSEBUTTONDOWN:
+                            print(bt.text)
+
+                    if pages_up_button.in_rect(x,y):
+                        json_list_page = json_list_page + 1
+                        if json_list_page+1 > pages_size:
+                            json_list_page = 0
+                        new_list =  page_list(json_list_page,json_list)
+                        json_button_list = load_list(new_list)
+
+                    if pages_down_button.in_rect(x,y):
+                        json_list_page = json_list_page - 1
+                        if json_list_page < 0 :
+                            json_list_page = pages_size-1
+                        new_list =  page_list(json_list_page,json_list)
+                        json_button_list = load_list(new_list)
             
-            pass
-            
+            if event.type == QUIT:
+                exit()
+            if event.type == MOUSEBUTTONDOWN:
+                
+                pass
 
-
-            # get_resource("json_file_name")
-
-            # pygame.draw.rect(screen, (0, 0, 0), all_text_rect)
-            
-            # read_commands(jsonfile,commands_count)
-
-
-
-    pygame.display.flip()         
+        pygame.display.flip()         
