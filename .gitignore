@@ -1,5 +1,6 @@
 utils
 resource
 json
-build
+*dist
+*build
 *.exe

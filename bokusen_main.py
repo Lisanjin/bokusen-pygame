@@ -10,7 +10,6 @@ import threading
 from pydub import AudioSegment
 import math
 import concurrent.futures
-import multiprocessing
 
 #用户设置
 user_setting_file =  open("settings.json",'r',encoding='utf8') 
@@ -23,6 +22,7 @@ print('----------------------------------------')
 #常量
 display_width = user_setting['窗口宽度']
 display_height = user_setting['窗口高度']
+bgm音量 = int(user_setting['bgm音量'].replace("%",''))*0.01
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)    
 GAME_SIZE = (display_width,display_height)
@@ -82,7 +82,6 @@ def read_commands(jsonfile,num):
             cg_control = Cg_Controller()
             txt_control = Text_Controller()
             anime_control = Anime_Controller()
-            sound_control = Sound_Controller()
             commands_count = 0
             is_play = False
             is_main = True
@@ -93,24 +92,17 @@ def read_commands(jsonfile,num):
 
             
 def execut_commands(tag,param):
+
     if tag=="bgmopt":
         pass
-    if tag=="playbgm":
-        global bgm_count
-        bgm_count = bgm_count+1
-
-        print("playbgm")
-        sound_file = get_sounds(param[-1])
-        globals()["th_"+str(bgm_count)] = pygame.mixer.Sound(sound_file)
-        globals()["th_"+str(bgm_count)].play()
-
-
+    
     if tag=="image":
         
         if param[16]!="1":
             image_num = int(param[-3])
             image_type = jsonfile['data']['code']['images'][image_num].replace("https://resource-asw.bokusen.net/resource/img/script/","").split("/")[0] 
             image_order = param[-8]
+            print("cg"+param[-3])
 
             cg = get_images(image_num)
 
@@ -167,14 +159,65 @@ def execut_commands(tag,param):
 
     if tag=="wait":
         pass
-    if tag=="fadeoutbgm":
-        globals()["th_"+str(bgm_count)].fadeout(3)
-
-    
     if tag=="wb":
         pass
+
+    if tag=="playbgm":
+        print('playbgm'+param[-1])
+        sound_file = get_sounds(param[-1])
+        Sound = pygame.mixer.Sound(sound_file)
+        
+        try:
+            if bgm_channel.get_busy():
+                print('正在播放')
+                bgm_channel.stop()
+                bgm_channel.play(Sound, loops=-1)
+            else:
+                print('没有播放')
+                bgm_channel.play(Sound, loops=-1)
+        except:
+            print('playbgm error')
+
+        
+
+    if tag=="fadeinbgm":
+        print('fadeinbgm'+param[1])
+
+        sound_file = get_sounds(param[1])
+        Sound = pygame.mixer.Sound(sound_file)
+        
+        try:
+            if bgm_channel.get_busy():
+                bgm_channel.stop()
+                bgm_channel.play(Sound, loops=-1)
+            else:
+                bgm_channel.play(Sound, loops=-1)
+        except:
+            print('fadeinbgm error')
+
+    if tag=="fadeoutbgm":
+        pass
+        # print("fadeoutbgm")
+        # try:
+        #     if bgm_channel.get_busy():
+        #         print('正在播放')
+        #         bgm_channel.stop()
+        # except:
+        #     print("fadeoutbgm error")
+            
+    
+    
     if tag=="fadebgm":
         pass
+        # print("fadebgm")
+        # try:
+        #     if bgm_channel.get_busy():
+        #         print('正在播放')
+
+        #         bgm_channel.stop()
+        # except:
+        #     print("fadebgm error")
+
     if tag=="seopt":
         pass
     if tag=="fadese":
@@ -192,7 +235,6 @@ def get_images(num):
     pattern = re.compile("^"+str(num)+"\..*")
     matching_file_names = [f for f in file_names if pattern.match(f)]
 
-    print(resouce_path+matching_file_names[0])
 
     return  pygame.image.load(resouce_path+matching_file_names[0]).convert_alpha()   
 
@@ -441,8 +483,8 @@ is_play = False
 is_main = True
 json_list_page = 0
 json_selected = False
-bgm_count = 0
-settings ={'bgm_count',0}
+bgm_channel = pygame.mixer.Channel(1)
+bgm_channel.set_volume(bgm音量)
 
 pages_up_rect = (600,550,150,50)
 page_down_rect = (150,550,150,50)
@@ -455,8 +497,6 @@ pages_down_button = Button(page_down_rect,"上一页")
 load_button = Button(load_rect,"load")
 play_button = Button(play_rect,"play")
 
-multiprocessing.freeze_support()
-multiprocessing.set_start_method('spawn')
 
 if __name__ == '__main__':
     while True:
